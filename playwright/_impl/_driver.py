@@ -14,23 +14,42 @@
 
 import inspect
 import os
+import shutil
 import sys
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import playwright
+from playwright._impl._errors import Error
 from playwright._repo_version import version
+
+
+def find_bun() -> Optional[str]:
+    # PLAYWRIGHT_NODEJS_PATH is honoured for compatibility with upstream.
+    for var in ("PLAYWRIGHT_BUN_PATH", "PLAYWRIGHT_NODEJS_PATH"):
+        if os.getenv(var):
+            return os.environ[var]
+    on_path = shutil.which("bun")
+    if on_path:
+        return on_path
+    # The bun installer puts the binary in $BUN_INSTALL/bin (default ~/.bun/bin)
+    # and only adds it to PATH of interactive shells.
+    bun_home = Path(os.getenv("BUN_INSTALL") or Path.home() / ".bun")
+    candidate = bun_home / "bin" / ("bun.exe" if sys.platform == "win32" else "bun")
+    return str(candidate) if candidate.is_file() else None
 
 
 def compute_driver_executable() -> Tuple[str, str]:
     driver_path = Path(inspect.getfile(playwright)).parent / "driver"
     cli_path = str(driver_path / "package" / "cli.js")
-    if sys.platform == "win32":
-        return (
-            os.getenv("PLAYWRIGHT_NODEJS_PATH", str(driver_path / "node.exe")),
-            cli_path,
+    bun = find_bun()
+    if not bun:
+        raise Error(
+            "bun was not found. This build of Playwright runs its driver with bun "
+            "instead of a bundled Node.js: install bun (https://bun.sh) and put it "
+            "on PATH, or set PLAYWRIGHT_BUN_PATH to the bun executable."
         )
-    return (os.getenv("PLAYWRIGHT_NODEJS_PATH", str(driver_path / "node")), cli_path)
+    return (bun, cli_path)
 
 
 def get_driver_env() -> dict:

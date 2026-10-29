@@ -28,6 +28,7 @@ from pixelmatch import pixelmatch
 from pixelmatch.contrib.PIL import from_PIL_to_raw_data
 
 import playwright
+from playwright._impl._driver import compute_driver_executable
 from playwright._impl._path_utils import get_file_dirname
 
 from .server import Server, test_server
@@ -232,16 +233,12 @@ class RemoteServer:
         self, browser_name: str, launch_server_options: Dict, tmpfile: Path
     ) -> None:
         driver_dir = Path(inspect.getfile(playwright)).parent / "driver"
-        if sys.platform == "win32":
-            node_executable = driver_dir / "node.exe"
-        else:
-            node_executable = driver_dir / "node"
-        cli_js = driver_dir / "package" / "cli.js"
+        node_executable, cli_js = compute_driver_executable()
         tmpfile.write_text(json.dumps(launch_server_options))
         self.process = subprocess.Popen(
             [
-                str(node_executable),
-                str(cli_js),
+                node_executable,
+                cli_js,
                 "launch-server",
                 "--browser",
                 browser_name,

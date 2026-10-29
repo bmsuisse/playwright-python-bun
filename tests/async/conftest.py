@@ -190,8 +190,8 @@ async def show_trace_viewer(browser: Browser) -> AsyncGenerator[Callable, None]:
         trace_path: Path,
     ) -> AsyncGenerator[TraceViewerPage, None]:
         trace_viewer_path = (
-            Path(compute_driver_executable()[0]) / "../package/lib/vite/traceViewer"
-        ).resolve()
+            Path(compute_driver_executable()[1]).parent / "lib/vite/traceViewer"
+        )
 
         server = HTTPServer()
         server.start(trace_viewer_path)

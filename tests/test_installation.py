@@ -15,7 +15,6 @@
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from venv import EnvBuilder
 
@@ -26,12 +25,7 @@ def test_install(tmp_path: Path, browser_name: str) -> None:
     env.create(env_dir=env_dir)
     context = env.ensure_directories(env_dir)
     root = Path(__file__).parent.parent.resolve()
-    if sys.platform == "win32":
-        wheelpath = list((root / "dist").glob("playwright*win_amd64*.whl"))[0]
-    elif sys.platform == "linux":
-        wheelpath = list((root / "dist").glob("playwright*manylinux1*.whl"))[0]
-    elif sys.platform == "darwin":
-        wheelpath = list((root / "dist").glob("playwright*macosx_*.whl"))[0]
+    wheelpath = list((root / "dist").glob("playwright*-py3-none-any.whl"))[0]
     subprocess.check_output(
         [
             context.env_exe,
