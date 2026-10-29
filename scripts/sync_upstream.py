@@ -29,8 +29,10 @@ conflict on every release:
   removed again after the merge;
 * ``UPSTREAM_TAG`` and ``FORK_REVISION`` are rewritten.
 
-Anything else that conflicts (typically setup.py or _driver.py when upstream
-touched them) aborts the merge and lists the files.
+A conflict in a file the fork never changed (release branches carry their own
+cherry-picks, so merging across minor versions produces some) is resolved by
+taking upstream's version. A conflict in a file the fork did change, typically
+setup.py or _driver.py, aborts the merge and lists the files.
 """
 
 import os
@@ -66,24 +68,37 @@ def latest_upstream_tag() -> str:
     return max(tags, key=lambda t: parse(t) or (0, 0, 0))
 
 
-def is_fork_workflow(path: str) -> bool:
-    return not path.startswith(f"{WORKFLOW_DIR}/") or Path(path).name.startswith(
+def is_upstream_workflow(path: str) -> bool:
+    return path.startswith(f"{WORKFLOW_DIR}/") and not Path(path).name.startswith(
         FORK_WORKFLOW_PREFIX
     )
 
 
 def drop_upstream_workflows() -> None:
-    tracked = git("ls-files", WORKFLOW_DIR).stdout.split()
-    stale = [p for p in tracked if not is_fork_workflow(p)]
+    stale = [p for p in git("ls-files", WORKFLOW_DIR).stdout.split() if is_upstream_workflow(p)]
     if stale:
         git("rm", "--quiet", "--force", "--", *stale)
 
 
-def unresolved_conflicts() -> List[str]:
-    unmerged = git("diff", "--name-only", "--diff-filter=U").stdout.split()
-    for path in [p for p in unmerged if not is_fork_workflow(p)]:
+def take_upstream(path: str) -> None:
+    if git("checkout", "--theirs", "--", path, check=False).returncode == 0:
+        git("add", "--", path)
+    else:  # upstream deleted the file
         git("rm", "--quiet", "--force", "--", path)
-    return [p for p in unmerged if is_fork_workflow(p)]
+
+
+def resolve_conflicts(current: str) -> List[str]:
+    """Resolve what can be resolved, return the conflicting files that need a human."""
+    fork_files = set(git("diff", "--name-only", current, "HEAD").stdout.split())
+    remaining = []
+    for path in git("diff", "--name-only", "--diff-filter=U").stdout.split():
+        if is_upstream_workflow(path):
+            git("rm", "--quiet", "--force", "--", path)
+        elif path in fork_files:
+            remaining.append(path)
+        else:
+            take_upstream(path)
+    return remaining
 
 
 def set_output(**values: str) -> None:
@@ -108,7 +123,7 @@ def main() -> int:
 
     print(f"Merging upstream {latest} (fork is on {current})")
     merge = git("merge", "--no-ff", "--no-commit", latest, check=False)
-    conflicts = unresolved_conflicts() if merge.returncode else []
+    conflicts = resolve_conflicts(current) if merge.returncode else []
     if conflicts:
         git("merge", "--abort")
         print(f"Merge of {latest} needs manual resolution:", file=sys.stderr)
