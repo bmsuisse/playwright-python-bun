@@ -17,7 +17,6 @@ jobs:
     - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: "3.10"
-    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -58,18 +57,23 @@ jobs:
         if-no-files-found: error
 
   test:
-    name: Test (${{ matrix.os }}, py${{ matrix.python-version }}, ${{ matrix.suite }})
+    name: Test (py${{ matrix.python-version }}, ${{ matrix.suite }})
     needs: wheel
     timeout-minutes: 45
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-        - { os: ubuntu-latest, python-version: '3.14', suite: full }
-        - { os: ubuntu-latest, python-version: '3.10', suite: smoke }
-        - { os: macos-latest, python-version: '3.10', suite: smoke }
-        - { os: windows-latest, python-version: '3.10', suite: smoke }
+        - { python-version: '3.14', suite: full }
+        - { python-version: '3.10', suite: smoke }
+    # Headless chromium on Linux only: that is what the fork is for. The headed
+    # tests (test_headful, page.pause) need a display and are left out.
+    env:
+      PYTEST_ARGS: >-
+        --browser=chromium --timeout 90
+        --ignore=tests/async/test_headful.py --ignore=tests/sync/test_headful.py
+        -k "not test_page_pause"
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -80,26 +84,21 @@ jobs:
       with:
         name: wheel
         path: dist
-    - name: Install dependencies & browsers
+    - name: Install dependencies & browser
       run: |
         python -m pip install --upgrade pip
         pip install -r local-requirements.txt
         pip install -r requirements.txt
         pip install -e .
-        python -m playwright install --with-deps chromium
+        python -m playwright install --with-deps --only-shell chromium
     - name: Fork tests
-      run: pytest tests/test_bun_driver.py tests/test_installation.py --browser=chromium --timeout 90
+      run: pytest tests/test_bun_driver.py tests/test_installation.py $PYTEST_ARGS
     - name: Common Tests
-      run: pytest tests/common --browser=chromium --timeout 90
+      run: pytest tests/common $PYTEST_ARGS
+    # Sync and async tests must run in separate pytest sessions.
     - name: Test Sync API
-      if: matrix.suite == 'full' && matrix.os != 'ubuntu-latest'
-      run: pytest tests/sync --browser=chromium --timeout 90
-    - name: Test Sync API
-      if: matrix.suite == 'full' && matrix.os == 'ubuntu-latest'
-      run: xvfb-run pytest tests/sync --browser=chromium --timeout 90
+      if: matrix.suite == 'full'
+      run: pytest tests/sync $PYTEST_ARGS
     - name: Test Async API
-      if: matrix.suite == 'full' && matrix.os != 'ubuntu-latest'
-      run: pytest tests/async --browser=chromium --timeout 90
-    - name: Test Async API
-      if: matrix.suite == 'full' && matrix.os == 'ubuntu-latest'
-      run: xvfb-run pytest tests/async --browser=chromium --timeout 90
+      if: matrix.suite == 'full'
+      run: pytest tests/async $PYTEST_ARGS

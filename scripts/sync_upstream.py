@@ -75,7 +75,11 @@ def is_upstream_workflow(path: str) -> bool:
 
 
 def drop_upstream_workflows() -> None:
-    stale = [p for p in git("ls-files", WORKFLOW_DIR).stdout.split() if is_upstream_workflow(p)]
+    stale = [
+        p
+        for p in git("ls-files", WORKFLOW_DIR).stdout.split()
+        if is_upstream_workflow(p)
+    ]
     if stale:
         git("rm", "--quiet", "--force", "--", *stale)
 
