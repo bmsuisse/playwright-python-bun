@@ -1,0 +1,105 @@
+name: Test
+
+# Reusable: builds the wheel and runs the tests with bun as the driver runtime.
+# Called by bun-ci.yml (push / PR) and bun-release.yml (before a release is cut).
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.10"
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r local-requirements.txt
+        pip install -r requirements.txt
+        pip install -e .
+    - name: Lint
+      run: pre-commit run --show-diff-on-failure --color=always --all-files
+
+  wheel:
+    name: Build wheel
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.10"
+    - name: Build
+      run: |
+        python -m pip install --upgrade pip build
+        python -m build --wheel
+    - name: Check the wheel is platform independent and has no Node.js
+      run: |
+        python - <<'PY'
+        import glob, zipfile
+        (wheel,) = glob.glob("dist/*.whl")
+        print(wheel)
+        assert wheel.endswith("-py3-none-any.whl"), "wheel must be py3-none-any"
+        names = zipfile.ZipFile(wheel).namelist()
+        binaries = [n for n in names if n.rsplit("/", 1)[-1] in ("node", "node.exe")]
+        assert not binaries, f"Node.js binary in wheel: {binaries}"
+        assert "playwright/driver/package/cli.js" in names, "driver is missing"
+        PY
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: wheel
+        path: dist/*.whl
+        if-no-files-found: error
+
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python-version }}, ${{ matrix.suite }})
+    needs: wheel
+    timeout-minutes: 45
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { os: ubuntu-latest, python-version: '3.14', suite: full }
+        - { os: ubuntu-latest, python-version: '3.10', suite: smoke }
+        - { os: macos-latest, python-version: '3.10', suite: smoke }
+        - { os: windows-latest, python-version: '3.10', suite: smoke }
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: wheel
+        path: dist
+    - name: Install dependencies & browsers
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r local-requirements.txt
+        pip install -r requirements.txt
+        pip install -e .
+        python -m playwright install --with-deps chromium
+    - name: Fork tests
+      run: pytest tests/test_bun_driver.py tests/test_installation.py --browser=chromium --timeout 90
+    - name: Common Tests
+      run: pytest tests/common --browser=chromium --timeout 90
+    - name: Test Sync API
+      if: matrix.suite == 'full' && matrix.os != 'ubuntu-latest'
+      run: pytest tests/sync --browser=chromium --timeout 90
+    - name: Test Sync API
+      if: matrix.suite == 'full' && matrix.os == 'ubuntu-latest'
+      run: xvfb-run pytest tests/sync --browser=chromium --timeout 90
+    - name: Test Async API
+      if: matrix.suite == 'full' && matrix.os != 'ubuntu-latest'
+      run: pytest tests/async --browser=chromium --timeout 90
+    - name: Test Async API
+      if: matrix.suite == 'full' && matrix.os == 'ubuntu-latest'
+      run: xvfb-run pytest tests/async --browser=chromium --timeout 90

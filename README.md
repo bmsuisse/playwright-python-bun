@@ -1,3 +1,5 @@
+> **Fork notice:** this is a fork of [microsoft/playwright-python](https://github.com/microsoft/playwright-python) that runs the Playwright driver with the system's [bun](https://bun.sh) instead of a bundled Node.js, which makes the wheel ~10x smaller. See [FORK.md](FORK.md).
+
 # 🎭 [Playwright](https://playwright.dev) for Python [![PyPI](https://badge.fury.io/py/playwright.svg)](https://pypi.python.org/pypi/playwright/) [![Join Discord](https://img.shields.io/badge/join-discord-infomational)](https://aka.ms/playwright/discord)
 
 Playwright is a Python library to automate [Chromium](https://www.chromium.org/Home), [Firefox](https://www.mozilla.org/en-US/firefox/new/) and [WebKit](https://webkit.org/) browsers with a single API. Playwright delivers automation that is **ever-green**, **capable**, **reliable** and **fast**. [See how Playwright is better](https://playwright.dev/python).

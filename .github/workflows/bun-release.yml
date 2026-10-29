@@ -1,0 +1,58 @@
+name: Release
+
+# Tests main and publishes the wheel as a GitHub release tagged
+# v<upstream>-bun.<FORK_REVISION>. bun-sync.yml starts this after merging a new
+# upstream release; start it by hand after bumping FORK_REVISION for a change
+# of the fork's own patch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/bun-test.yml
+
+  release:
+    name: Publish release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.10"
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: wheel
+        path: dist
+    - name: Create release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        tag=$(python scripts/fork_version.py --tag)
+        version=$(python scripts/fork_version.py)
+        upstream=$(cat UPSTREAM_TAG)
+        if gh release view "$tag" > /dev/null 2>&1; then
+          echo "Release $tag already exists. Bump FORK_REVISION to publish a new build."
+          exit 1
+        fi
+        gh release create "$tag" dist/*.whl \
+          --target "$GITHUB_SHA" \
+          --title "Playwright $version" \
+          --notes "Playwright for Python $upstream with the driver run by the system's bun instead of a bundled Node.js. See [FORK.md](https://github.com/$GITHUB_REPOSITORY/blob/$tag/FORK.md) for installation."
+        gh release view "$tag" --json assets --jq '.assets[] | "\(.name) \(.url)"' >> "$GITHUB_STEP_SUMMARY"
+
+  report-failure:
+    name: Report failure
+    needs: [test, release]
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Open an issue
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: scripts/report_failure.sh "Release failed" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

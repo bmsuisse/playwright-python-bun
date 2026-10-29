@@ -2,6 +2,14 @@
 
 Guidance for Claude when working in this repository.
 
+## Fork notice (bun)
+
+This repo is a fork that runs the driver with the system's bun instead of a bundled Node.js. Read [`FORK.md`](FORK.md) before touching `setup.py`, `playwright/_impl/_driver.py`, `scripts/` or `.github/workflows/`: it lists the fork-owned files and how upstream releases are merged.
+
+- Don't bring back the Node.js bundling. `scripts/build_driver.py`, `NODE_VERSION` and `scripts/update_node_version.py` are unused upstream leftovers; the wheel is built by `setup.py` + `scripts/fetch_driver.py` (the Layout/Setup notes below about per-platform bundles and `npm pack` don't apply).
+- Only `.github/workflows/bun-*.yml` are used. Upstream's workflows publish to PyPI and are deleted on every sync.
+- Rolling to a new Playwright version is `python scripts/sync_upstream.py` (a merge of the upstream tag), not the roll skill below.
+
 ## What this is
 
 Python bindings for [Playwright](https://playwright.dev). The Python client talks JSON over a pipe to the Node-based driver bundled in `playwright/driver/`. The pipe protocol is defined upstream in `packages/protocol/spec/*.yml`.
