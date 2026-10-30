@@ -1,9 +1,15 @@
 name: Release
 
-# Tests main and publishes the wheel as a GitHub release tagged
-# v<upstream>-bun.<FORK_REVISION>. bun-sync.yml starts this after merging a new
+# Tests main, publishes the wheel as a GitHub release tagged
+# v<upstream>-bun.<FORK_REVISION> and uploads it to PyPI as
+# playwright-bun-unofficial. bun-sync.yml starts this after merging a new
 # upstream release; start it by hand after bumping FORK_REVISION for a change
 # of the fork's own patch.
+#
+# PyPI uses trusted publishing: PyPI trusts this workflow file in the "pypi"
+# environment, so no PyPI token is stored. If only the upload fails, re-run the
+# failed jobs; the GitHub release is not created twice and a file PyPI already
+# accepted is skipped.
 on:
   workflow_dispatch:
 
@@ -45,9 +51,28 @@ jobs:
           --notes "Playwright for Python $upstream with the driver run by the system's bun instead of a bundled Node.js. See [FORK.md](https://github.com/$GITHUB_REPOSITORY/blob/$tag/FORK.md) for installation."
         gh release view "$tag" --json assets --jq '.assets[] | "\(.name) \(.url)"' >> "$GITHUB_STEP_SUMMARY"
 
+  pypi:
+    name: Upload to PyPI
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/playwright-bun-unofficial/
+    permissions:
+      # Lets the job get the GitHub OIDC token that PyPI trusted publishing needs.
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: wheel
+        path: dist
+    - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+      with:
+        skip-existing: true
+
   report-failure:
     name: Report failure
-    needs: [test, release]
+    needs: [test, release, pypi]
     if: ${{ failure() }}
     runs-on: ubuntu-latest
     steps:

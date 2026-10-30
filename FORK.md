@@ -18,7 +18,8 @@ found does the same for bun.
 | -------------- | --------------------------- | -------------------------- |
 | Wheels         | one per OS/CPU (~45 MB each) | one `py3-none-any` (~3.7 MB) |
 | Driver runtime | Node.js, bundled            | bun, from `PATH`           |
-| Version        | `1.64.1`                    | `1.64.1+bun.1`             |
+| Version        | `1.64.1`                    | `1.64.1.post1`             |
+| PyPI name      | `playwright`                | `playwright-bun-unofficial` |
 
 The Python API is untouched: `import playwright` works exactly as before. The driver is
 the same `playwright-core` npm package as upstream, run as `bun cli.js`.
@@ -30,18 +31,32 @@ Requires [bun](https://bun.sh) on `PATH`. The runtime is looked up in this order
 `bun` on `PATH`, `$BUN_INSTALL/bin/bun` (default `~/.bun/bin/bun`). If none is found the
 first call raises an error that says so.
 
-With uv, as a drop-in replacement for the `playwright` distribution (this also satisfies
-`pytest-playwright` and other packages that depend on `playwright`):
+The fork is published on PyPI as
+[`playwright-bun-unofficial`](https://pypi.org/project/playwright-bun-unofficial/). It is
+not an official Microsoft release. The import name is still `playwright`, so the
+distribution conflicts with upstream's `playwright`: install one of them, not both.
+
+```sh
+uv add playwright-bun-unofficial     # or: pip install playwright-bun-unofficial
+```
+
+Packages that depend on `playwright`, such as `pytest-playwright`, would pull in upstream's
+distribution next to it. With uv, switch that dependency off:
 
 ```toml
 # pyproject.toml
-[tool.uv.sources]
-playwright = { git = "https://github.com/bmsuisse/playwright-python-bun", tag = "v1.64.1-bun.1" }
+[project]
+dependencies = ["playwright-bun-unofficial"]
+
+[tool.uv]
+override-dependencies = ["playwright ; sys_platform == 'never'"]
 ```
 
-or with pip: `pip install "git+https://github.com/bmsuisse/playwright-python-bun@v1.64.1-bun.1"`.
-The wheel is also attached to every [release](../../releases). Building from git downloads
-the driver from the npm registry, so it needs network access but neither Node.js nor npm.
+Without PyPI, the same wheel is attached to every [release](../../releases), and you can
+install from git with
+`pip install "git+https://github.com/bmsuisse/playwright-python-bun@v1.64.1-bun.1"`.
+Building from git downloads the driver from the npm registry, so it needs network access
+but neither Node.js nor npm.
 
 Then install the browser. For headless-only CI the headless shell is enough, and much
 smaller than full Chromium:
@@ -75,7 +90,8 @@ a known-good bun meanwhile, set `PLAYWRIGHT_BUN_PATH=/path/to/bun`.
 1. `scripts/sync_upstream.py` merges the newest stable upstream tag (`vX.Y.Z`) into `main`,
    deletes upstream's workflows and `dependabot.yml` again, sets `UPSTREAM_TAG` and resets `FORK_REVISION` to 1.
 2. It pushes `main` and starts `bun-release.yml`, which builds the wheel, runs the tests
-   with bun and publishes the release `vX.Y.Z-bun.1` with the wheel attached.
+   with bun, publishes the release `vX.Y.Z-bun.1` with the wheel attached and uploads the
+   wheel to PyPI.
 
 If the merge conflicts, or the tests fail on the new version, the run fails and opens an
 issue. Nothing is released until it is fixed.
@@ -103,7 +119,8 @@ re-enable *Sync upstream* if the Actions tab says so.
 | --- | --- |
 | `playwright/_impl/_driver.py` | find bun instead of the bundled `driver/node` |
 | `setup.py`, `scripts/fetch_driver.py` | build one pure wheel; download `playwright-core` from npm (integrity-checked) instead of `build_driver.py` |
-| `UPSTREAM_TAG`, `FORK_REVISION`, `scripts/fork_version.py` | version is `<upstream>+bun.<revision>` |
+| `pyproject.toml` | distribution name `playwright-bun-unofficial`, description and URLs |
+| `UPSTREAM_TAG`, `FORK_REVISION`, `scripts/fork_version.py` | version is `<upstream>.post<revision>` (PyPI rejects local versions like `+bun.1`) |
 | `scripts/sync_upstream.py`, `scripts/report_failure.sh` | the upstream merge and failure issue |
 | `.github/workflows/bun-*.yml` | CI, release and sync; upstream's workflows and `dependabot.yml` are deleted |
 | `tests/test_bun_driver.py` | runtime lookup tests |
