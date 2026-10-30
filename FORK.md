@@ -93,6 +93,12 @@ a known-good bun meanwhile, set `PLAYWRIGHT_BUN_PATH=/path/to/bun`.
    with bun, publishes the release `vX.Y.Z-bun.1` with the wheel attached and uploads the
    wheel to PyPI.
 
+`bun-release.yml` also runs on every push to `main` and releases whenever the version
+(`UPSTREAM_TAG` + `FORK_REVISION`) is not on PyPI yet, so merging a PR that bumps
+`FORK_REVISION` is all it takes to ship a change of the fork's own code. A push that does
+not change the version stops after a PyPI lookup. A change to the fork without a
+`FORK_REVISION` bump is not released.
+
 If the merge conflicts, or the tests fail on the new version, the run fails and opens an
 issue. Nothing is released until it is fixed.
 
@@ -107,8 +113,9 @@ Conflicts are only reported for files the fork changed (listed below); upstream'
 right for everything else. Keep the fork's behaviour in those files, carry over whatever
 upstream changed, then `git rm` upstream's workflows (anything in `.github/workflows` that
 is not `bun-*.yml`) and `.github/dependabot.yml`, write `vX.Y.Z` to `UPSTREAM_TAG`, `1` to `FORK_REVISION`, commit,
-push, and run the *Release* workflow. Changed the fork's own code instead? Bump
-`FORK_REVISION` and run *Release*; the tag becomes `vX.Y.Z-bun.<revision>`.
+push; the push releases it. Changed the fork's own code instead? Bump `FORK_REVISION` in
+the PR; merging releases it and the tag becomes `vX.Y.Z-bun.<revision>`. *Release* can also
+be run by hand to retry, for example after fixing the PyPI setup.
 
 Scheduled workflows are paused by GitHub after 60 days without repository activity, so
 re-enable *Sync upstream* if the Actions tab says so.

@@ -1,24 +1,56 @@
 name: Release
 
-# Tests main, publishes the wheel as a GitHub release tagged
+# Releases main whenever its version (UPSTREAM_TAG + FORK_REVISION) is not on PyPI
+# yet: tests it, publishes the wheel as a GitHub release tagged
 # v<upstream>-bun.<FORK_REVISION> and uploads it to PyPI as
-# playwright-bun-unofficial. bun-sync.yml starts this after merging a new
-# upstream release; start it by hand after bumping FORK_REVISION for a change
-# of the fork's own patch.
+# playwright-bun-unofficial. Runs on every push to main, so merging a change that
+# bumps FORK_REVISION releases it; any other push finds the version on PyPI and
+# stops after the first job. bun-sync.yml pushes with the default token, which
+# starts no workflows, so it dispatches this one after merging a new upstream
+# release. Dispatch it by hand to retry.
 #
 # PyPI uses trusted publishing: PyPI trusts this workflow file in the "pypi"
 # environment, so no PyPI token is stored. If only the upload fails, re-run the
 # failed jobs; the GitHub release is not created twice and a file PyPI already
 # accepted is skipped.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
+
+# One release at a time. GitHub keeps only one waiting run, so when pushes pile up the
+# newest wins and a version that was superseded before it started is never released.
+concurrency:
+  group: bun-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
   issues: write
 
 jobs:
+  check:
+    name: Check PyPI
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.pypi.outputs.publish }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Is this version on PyPI?
+      id: pypi
+      run: |
+        version=$(python3 scripts/fork_version.py)
+        status=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/playwright-bun-unofficial/$version/json")
+        case "$status" in
+          200) echo "publish=false" >> "$GITHUB_OUTPUT"
+               echo "::notice::$version is already on PyPI. Bump FORK_REVISION to release a new build." ;;
+          404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+          *) echo "PyPI answered $status for $version"; exit 1 ;;
+        esac
+
   test:
+    needs: check
+    if: needs.check.outputs.publish == 'true'
     uses: ./.github/workflows/bun-test.yml
 
   release:
@@ -41,9 +73,16 @@ jobs:
         tag=$(python scripts/fork_version.py --tag)
         version=$(python scripts/fork_version.py)
         upstream=$(cat UPSTREAM_TAG)
+        # A rerun after a failed PyPI upload finds the release already there. Only
+        # accept it if it is this commit: the PyPI job uploads this run's wheel.
         if gh release view "$tag" > /dev/null 2>&1; then
-          echo "Release $tag already exists. Bump FORK_REVISION to publish a new build."
-          exit 1
+          released=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha)
+          if [ "$released" != "$GITHUB_SHA" ]; then
+            echo "Release $tag was cut from $released, not $GITHUB_SHA. Re-run the failed jobs of the run that created it, or bump FORK_REVISION."
+            exit 1
+          fi
+          echo "Release $tag already exists for this commit, not creating it again."
+          exit 0
         fi
         gh release create "$tag" dist/*.whl \
           --target "$GITHUB_SHA" \
@@ -72,7 +111,7 @@ jobs:
 
   report-failure:
     name: Report failure
-    needs: [test, release, pypi]
+    needs: [check, test, release, pypi]
     if: ${{ failure() }}
     runs-on: ubuntu-latest
     steps:
