@@ -3,8 +3,8 @@ requires = ["setuptools==82.0.1", "setuptools-scm==10.3.4", "wheel==0.48.0", "au
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "playwright"
-description = "A high-level API to automate web browsers"
+name = "playwright-bun-unofficial"
+description = "Unofficial fork of Playwright for Python that runs the driver with bun instead of a bundled Node.js"
 authors = [
     {name = "Microsoft Corporation"}
 ]
@@ -33,8 +33,9 @@ classifiers = [
 ]
 
 [project.urls]
-homepage = "https://github.com/Microsoft/playwright-python"
-"Release notes" = "https://github.com/microsoft/playwright-python/releases"
+homepage = "https://github.com/bmsuisse/playwright-python-bun"
+"Release notes" = "https://github.com/bmsuisse/playwright-python-bun/releases"
+"Upstream" = "https://github.com/microsoft/playwright-python"
 
 [project.scripts]
 playwright = "playwright.__main__:main"

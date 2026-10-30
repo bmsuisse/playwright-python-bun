@@ -30,7 +30,7 @@ import fetch_driver  # noqa: E402
 import fork_version  # noqa: E402
 
 # The tree is a merge of an upstream tag plus fork commits, so setuptools-scm
-# would report a dev version; pin it to <upstream>+bun.<revision> instead.
+# would report a dev version; pin it to <upstream>.post<revision> instead.
 os.environ.setdefault("SETUPTOOLS_SCM_PRETEND_VERSION", fork_version.fork_version())
 
 # Metadata-only invocations (egg_info, dist_info, sdist) don't need the driver.

@@ -19,7 +19,7 @@ UPSTREAM_TAG      the upstream release the tree is based on, e.g. ``v1.64.1``
 FORK_REVISION     bumped by hand when the fork's own patch changes; reset to 1
                   by scripts/sync_upstream.py on every upstream release
 
-``python scripts/fork_version.py``        -> ``1.64.1+bun.1`` (Python version)
+``python scripts/fork_version.py``        -> ``1.64.1.post1`` (Python version)
 ``python scripts/fork_version.py --tag``  -> ``v1.64.1-bun.1`` (git tag)
 """
 
@@ -38,7 +38,8 @@ def upstream_version() -> str:
 
 
 def fork_version() -> str:
-    return f"{upstream_version()}+bun.{_read('FORK_REVISION')}"
+    # A post release, not a local version (+bun.1): PyPI rejects local versions.
+    return f"{upstream_version()}.post{_read('FORK_REVISION')}"
 
 
 def fork_tag() -> str:
