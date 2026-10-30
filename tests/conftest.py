@@ -24,8 +24,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, cast
 import pytest
 from _pytest.terminal import TerminalReporter
 from PIL import Image
-from pixelmatch import pixelmatch
-from pixelmatch.contrib.PIL import from_PIL_to_raw_data
+from pixelmatch.contrib.PIL import pixelmatch
 
 import playwright
 from playwright._impl._driver import compute_driver_executable
@@ -210,13 +209,7 @@ def assert_to_be_golden(browser_name: str) -> Callable[[bytes, str], None]:
             if golden_image.size != received_image.size:
                 pytest.fail("Image size differs to golden image")
                 return
-            diff_pixels = pixelmatch(
-                from_PIL_to_raw_data(received_image),
-                from_PIL_to_raw_data(golden_image),
-                golden_image.size[0],
-                golden_image.size[1],
-                threshold=0.2,
-            )
+            diff_pixels = pixelmatch(received_image, golden_image, threshold=0.2)
             assert diff_pixels == 0
         except Exception:
             if os.getenv("PW_WRITE_SCREENSHOT"):
