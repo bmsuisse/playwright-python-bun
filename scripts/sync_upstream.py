@@ -26,7 +26,8 @@ conflict on every release:
 
 * upstream's GitHub workflows are not used by the fork (they publish to PyPI
   with upstream's identity), so every workflow not named ``bun-*.yml`` is
-  removed again after the merge;
+  removed again after the merge, and so is ``dependabot.yml`` (it would open
+  PRs bumping upstream's pinned requirements);
 * ``UPSTREAM_TAG`` and ``FORK_REVISION`` are rewritten.
 
 A conflict in a file the fork never changed (release branches carry their own
@@ -47,6 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 STABLE_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 WORKFLOW_DIR = ".github/workflows"
 FORK_WORKFLOW_PREFIX = "bun-"
+UPSTREAM_AUTOMATION = ".github/dependabot.yml"
 
 
 def git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -69,15 +71,17 @@ def latest_upstream_tag() -> str:
 
 
 def is_upstream_workflow(path: str) -> bool:
-    return path.startswith(f"{WORKFLOW_DIR}/") and not Path(path).name.startswith(
-        FORK_WORKFLOW_PREFIX
+    """Upstream's CI configuration, which the fork replaces with its own bun-*.yml."""
+    return path == UPSTREAM_AUTOMATION or (
+        path.startswith(f"{WORKFLOW_DIR}/")
+        and not Path(path).name.startswith(FORK_WORKFLOW_PREFIX)
     )
 
 
 def drop_upstream_workflows() -> None:
     stale = [
         p
-        for p in git("ls-files", WORKFLOW_DIR).stdout.split()
+        for p in git("ls-files", WORKFLOW_DIR, UPSTREAM_AUTOMATION).stdout.split()
         if is_upstream_workflow(p)
     ]
     if stale:

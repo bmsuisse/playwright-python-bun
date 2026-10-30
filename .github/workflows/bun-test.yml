@@ -25,7 +25,7 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ inputs.ref }}
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: "3.10"
     - name: Install dependencies
@@ -44,7 +44,7 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ inputs.ref }}
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: "3.10"
     - name: Build
@@ -81,17 +81,19 @@ jobs:
         - { python-version: '3.14', suite: full }
         - { python-version: '3.10', suite: smoke }
     # Headless chromium on Linux only: that is what the fork is for. The headed
-    # tests (test_headful, page.pause) need a display and are left out.
+    # tests (test_headful, page.pause) need a display and are left out, as is the
+    # test that expects the full chromium next to the headless shell we install.
     env:
-      PYTEST_ARGS: >-
+      # pytest splits PYTEST_ADDOPTS with shell quoting rules, so -k works.
+      PYTEST_ADDOPTS: >-
         --browser=chromium --timeout 90
         --ignore=tests/async/test_headful.py --ignore=tests/sync/test_headful.py
-        -k "not test_page_pause"
+        -k "not test_page_pause and not test_browser_type_executable_path_should_work"
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ inputs.ref }}
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: ${{ matrix.python-version }}
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -109,13 +111,13 @@ jobs:
         pip install -e .
         python -m playwright install --with-deps --only-shell chromium
     - name: Fork tests
-      run: pytest tests/test_bun_driver.py tests/test_installation.py $PYTEST_ARGS
+      run: pytest tests/test_bun_driver.py tests/test_installation.py
     - name: Common Tests
-      run: pytest tests/common $PYTEST_ARGS
+      run: pytest tests/common
     # Sync and async tests must run in separate pytest sessions.
     - name: Test Sync API
       if: matrix.suite == 'full'
-      run: pytest tests/sync $PYTEST_ARGS
+      run: pytest tests/sync
     - name: Test Async API
       if: matrix.suite == 'full'
-      run: pytest tests/async $PYTEST_ARGS
+      run: pytest tests/async
