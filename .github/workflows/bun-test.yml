@@ -81,13 +81,14 @@ jobs:
         - { python-version: '3.14', suite: full }
         - { python-version: '3.10', suite: smoke }
     # Headless chromium on Linux only: that is what the fork is for. The headed
-    # tests (test_headful, page.pause) need a display and are left out.
+    # tests (test_headful, page.pause) need a display and are left out, as is the
+    # test that expects the full chromium next to the headless shell we install.
     env:
       # pytest splits PYTEST_ADDOPTS with shell quoting rules, so -k works.
       PYTEST_ADDOPTS: >-
         --browser=chromium --timeout 90
         --ignore=tests/async/test_headful.py --ignore=tests/sync/test_headful.py
-        -k "not test_page_pause"
+        -k "not test_page_pause and not test_browser_type_executable_path_should_work"
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
