@@ -73,7 +73,7 @@ a known-good bun meanwhile, set `PLAYWRIGHT_BUN_PATH=/path/to/bun`.
 `main` is upstream plus a small patch. `.github/workflows/bun-sync.yml` runs daily:
 
 1. `scripts/sync_upstream.py` merges the newest stable upstream tag (`vX.Y.Z`) into `main`,
-   deletes upstream's workflows again, sets `UPSTREAM_TAG` and resets `FORK_REVISION` to 1.
+   deletes upstream's workflows and `dependabot.yml` again, sets `UPSTREAM_TAG` and resets `FORK_REVISION` to 1.
 2. It pushes `main` and starts `bun-release.yml`, which builds the wheel, runs the tests
    with bun and publishes the release `vX.Y.Z-bun.1` with the wheel attached.
 
@@ -90,7 +90,7 @@ git merge vX.Y.Z                     # the tag named in the issue
 Conflicts are only reported for files the fork changed (listed below); upstream's side is
 right for everything else. Keep the fork's behaviour in those files, carry over whatever
 upstream changed, then `git rm` upstream's workflows (anything in `.github/workflows` that
-is not `bun-*.yml`), write `vX.Y.Z` to `UPSTREAM_TAG`, `1` to `FORK_REVISION`, commit,
+is not `bun-*.yml`) and `.github/dependabot.yml`, write `vX.Y.Z` to `UPSTREAM_TAG`, `1` to `FORK_REVISION`, commit,
 push, and run the *Release* workflow. Changed the fork's own code instead? Bump
 `FORK_REVISION` and run *Release*; the tag becomes `vX.Y.Z-bun.<revision>`.
 
@@ -105,7 +105,7 @@ re-enable *Sync upstream* if the Actions tab says so.
 | `setup.py`, `scripts/fetch_driver.py` | build one pure wheel; download `playwright-core` from npm (integrity-checked) instead of `build_driver.py` |
 | `UPSTREAM_TAG`, `FORK_REVISION`, `scripts/fork_version.py` | version is `<upstream>+bun.<revision>` |
 | `scripts/sync_upstream.py`, `scripts/report_failure.sh` | the upstream merge and failure issue |
-| `.github/workflows/bun-*.yml` | CI, release and sync; upstream's workflows are deleted |
+| `.github/workflows/bun-*.yml` | CI, release and sync; upstream's workflows and `dependabot.yml` are deleted |
 | `tests/test_bun_driver.py` | runtime lookup tests |
 | `tests/conftest.py`, `tests/{async,sync}/conftest.py`, `tests/test_installation.py` | locate the driver through `compute_driver_executable()`; single wheel |
 | `README.md`, `CLAUDE.md`, `FORK.md` | fork notices |

@@ -93,11 +93,11 @@ class HttpsResource(resource.Resource):
 @pytest.fixture(scope="session", autouse=True)
 def _client_certificate_server(assetdir: Path) -> Generator[None, None, None]:
     certAuthCert = ssl.Certificate.loadPEM(
-        (assetdir / "client-certificates/server/server_cert.pem").read_text()
+        (assetdir / "client-certificates/server/server_cert.pem").read_bytes()
     )
     serverCert = ssl.PrivateCertificate.loadPEM(
-        (assetdir / "client-certificates/server/server_key.pem").read_text()
-        + (assetdir / "client-certificates/server/server_cert.pem").read_text()
+        (assetdir / "client-certificates/server/server_key.pem").read_bytes()
+        + (assetdir / "client-certificates/server/server_cert.pem").read_bytes()
     )
 
     contextFactory = serverCert.options(certAuthCert)
