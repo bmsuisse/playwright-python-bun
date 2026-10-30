@@ -1,0 +1,49 @@
+name: Bun compatibility
+
+# Only the latest bun is supported, and a released wheel does not pin it. Weekly, run
+# the latest release's own tests against the newest bun, so a bun release that breaks
+# the driver is noticed here, before an agent upgrades.
+on:
+  schedule:
+  - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  release:
+    name: Find the latest release
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.latest.outputs.tag }}
+    steps:
+    - id: latest
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName || true)
+        echo "Testing release: ${tag:-none yet}"
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Latest bun
+    needs: release
+    if: ${{ needs.release.outputs.tag != '' }}
+    uses: ./.github/workflows/bun-test.yml
+    with:
+      ref: ${{ needs.release.outputs.tag }}
+      bun-version: latest
+
+  report-failure:
+    name: Report failure
+    needs: test
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Open an issue
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: scripts/report_failure.sh "Released version breaks with the latest bun" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

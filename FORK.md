@@ -53,6 +53,21 @@ playwright install --with-deps --only-shell chromium
 Not supported: PyInstaller/Nuitka-frozen apps still need bun on the target machine, the
 driver is no longer inside the executable.
 
+## bun versions
+
+Only the latest bun is supported; CI builds and tests with it. The wheel does not pin bun
+(it runs whatever `bun` is on the machine), so older bun versions are not expected to
+work: 1.3.6 and 1.3.9 fail, for example, because they lack the `pfx` TLS option that client
+certificates use and differ in Node's HTTP request behaviour that `APIRequestContext`
+relies on, and the driver then dies mid-session. 1.4.0 is the first version that passed
+our checks. Keep agents on a current bun, including any "install bun if missing" fallback
+that pins a version.
+
+`bun-canary.yml` runs weekly: it takes the latest release tag, runs its headless test
+suite against the newest bun, and opens an issue if that fails, so a bun release that
+breaks an already published wheel is noticed before agents pick it up. To hold an agent on
+a known-good bun meanwhile, set `PLAYWRIGHT_BUN_PATH=/path/to/bun`.
+
 ## How the fork is kept up to date
 
 `main` is upstream plus a small patch. `.github/workflows/bun-sync.yml` runs daily:
@@ -101,20 +116,21 @@ Unused upstream leftovers, deliberately not deleted so merges stay clean:
 ## Behaviour differences
 
 bun is not Node.js. Upstream's headless chromium suite (everything except the headed
-`test_headful` and `page.pause` tests) was run on both runtimes, `tests/common`,
-`tests/sync` and `tests/async` as separate pytest sessions like upstream's CI, with
-bun 1.4.2 and Node.js 24:
+`test_headful` and `page.pause` tests) was run on Node.js 24 and on bun, with
+`tests/common`, `tests/sync` and `tests/async` as separate pytest sessions like upstream's
+CI:
 
-| | sync | async |
+| runtime | sync | async |
 | --- | --- | --- |
-| Node.js | 779 passed | 1634 passed |
-| bun | 779 passed | 1634 passed, 1 teardown error (see below) |
+| Node.js 24 | 779 passed | 1634 passed |
+| bun 1.4.2 | 779 passed | 1634 passed, 1 teardown error (see below) |
+| bun 1.4.4 (latest when written) | 778 passed, 1 failed (see below) | 1633 passed, 1 failed (see below) |
 
-- An untrusted client certificate makes `APIRequestContext` fail with
-  `socket hang up (ECONNRESET)` on bun instead of Node's `alert unknown ca`. The request
-  fails either way; only the message differs. The two tests that match the message accept
-  both.
+- The error message for an untrusted client certificate is worded differently on every
+  runtime: `alert unknown ca` on Node.js, `socket hang up (ECONNRESET)` on bun 1.4.2 and
+  `TLSV1_ALERT_UNKNOWN_CA` on bun 1.4.4. The request fails either way. The failed 1.4.4
+  runs were that test matching the 1.4.2 wording; it now accepts all three.
 - `test_screencast.py::test_should_report_callback_errors_and_continue_delivering_frames`
-  failed once with a teardown error in one full bun run (a frame callback that raises on
-  purpose while the context closes). It passed in 8 of 8 repeats of the file and did not
-  occur on Node.js; treat it as a flaky test unless it starts to recur in CI.
+  failed once with a teardown error in one full bun 1.4.2 run (a frame callback that
+  raises on purpose while the context closes). It passed in 8 of 8 repeats of the file and
+  did not occur on Node.js; treat it as a flaky test unless it starts to recur in CI.

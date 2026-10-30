@@ -131,7 +131,7 @@ def test_should_throw_with_untrusted_client_certs(
             }
         ],
     )
-    with pytest.raises(Exception, match="alert unknown ca|socket hang up"):
+    with pytest.raises(Exception, match="(?i)alert[ _]unknown[ _]ca|socket hang up"):
         request.get(serverURL)
     request.dispose()
 
