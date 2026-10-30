@@ -83,7 +83,8 @@ jobs:
     # Headless chromium on Linux only: that is what the fork is for. The headed
     # tests (test_headful, page.pause) need a display and are left out.
     env:
-      PYTEST_ARGS: >-
+      # pytest splits PYTEST_ADDOPTS with shell quoting rules, so -k works.
+      PYTEST_ADDOPTS: >-
         --browser=chromium --timeout 90
         --ignore=tests/async/test_headful.py --ignore=tests/sync/test_headful.py
         -k "not test_page_pause"
@@ -109,13 +110,13 @@ jobs:
         pip install -e .
         python -m playwright install --with-deps --only-shell chromium
     - name: Fork tests
-      run: pytest tests/test_bun_driver.py tests/test_installation.py $PYTEST_ARGS
+      run: pytest tests/test_bun_driver.py tests/test_installation.py
     - name: Common Tests
-      run: pytest tests/common $PYTEST_ARGS
+      run: pytest tests/common
     # Sync and async tests must run in separate pytest sessions.
     - name: Test Sync API
       if: matrix.suite == 'full'
-      run: pytest tests/sync $PYTEST_ARGS
+      run: pytest tests/sync
     - name: Test Async API
       if: matrix.suite == 'full'
-      run: pytest tests/async $PYTEST_ARGS
+      run: pytest tests/async
